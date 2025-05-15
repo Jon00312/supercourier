@@ -135,7 +135,7 @@ def generate_weather_data():
     logger.info(f"Weather data generated for period {start_date.strftime('%Y-%m-%d')} - {end_date.strftime('%Y-%m-%d')}")
     return weather_data
 
-# 3. EXTRACTION FUNCTIONS (to be completed)
+# 3. EXTRACTION FUNCTIONS
 def extract_sqlite_data():
     """
     Extracts delivery data from SQLite database
@@ -162,7 +162,7 @@ def load_weather_data():
     logger.info(f"Weather data loaded for {len(weather_data)} days")
     return weather_data
 
-# 4. TRANSFORMATION FUNCTIONS (to be completed by participants)
+# 4. TRANSFORMATION FUNCTIONS
 
 def enrich_with_weekday_and_hour(df):
     logger.info("Enriching with weekday and hour of the day...")
@@ -174,11 +174,19 @@ def enrich_with_weekday_and_hour(df):
     df['hour'] = df['pickup_datetime'].dt.hour
     return df
 
-def enrich_with_distance(df):
-    df['distance'] = [random.randint(1, 100) for _ in range(len(df))]
-    df['actual_delivery_time'] = [random.randint(1, 100) for _ in range(len(df))]
-
-    return df
+def enrich_with_random_distance_and_delivery_time(df):
+    logger.info("Adding random distance and delivery time...")
+    try:
+        # Distance has to be simulated, so it will be between 1 and 100 km
+        df['distance'] = [random.randint(1, 100) for _ in range(len(df))]
+        # Base time is given
+        base_time = 30 + df['distance'] * 0.8
+        # Actual Delivery time has to be simulated, so it will be between -10% and +50% of the base time
+        df['actual_delivery_time'] = round(base_time * np.random.uniform(0.9, 1.5, len(df))).astype(int)
+        return df
+    except Exception as e:
+        logger.error(f"Error in enrich_with_random_distance_and_delivery_time: {e}")
+        raise
 
 def enrich_with_weather(df, weather_data):
     """
@@ -197,15 +205,16 @@ def enrich_with_weather(df, weather_data):
         try:
             return weather_data[date_str][hour_str]
         except KeyError:
+            logger.warning(f"Missing weather for {date_str} {hour_str}")
             return None
     
     # Apply function to each row
     df['WeatherCondition'] = df['pickup_datetime'].apply(get_weather)
-    
     return df
 
 def enrich_with_status(df):
-    df['status'] = df.apply(calculate_delivery_time)
+    # we use axis = 1 to apply the fonction on every line, instead of axis 0 which applies on every column
+    df['status'] = df.apply(calculate_delivery_time, axis=1)
     return df
 
 def calculate_delivery_time(row):
@@ -267,8 +276,7 @@ def calculate_delivery_time(row):
 
     # Final delay threshold
     delay_threshold = adjusted_time * 1.2  # 20% margin
-
-    return delay_threshold > row['actual_delivery_time']
+    return 'On-time' if delay_threshold > row['actual_delivery_time'] else 'Delayed'
 
 
 def transform_data(df_deliveries, weather_data):
@@ -277,33 +285,60 @@ def transform_data(df_deliveries, weather_data):
     To be completed by participants
     """
     logger.info("Transforming data...")
-    
-    # TODO: Add your transformation code here
+    # 1. Enrich with weekday and hour from dataframe timestamp
     df_deliveries = enrich_with_weekday_and_hour(df_deliveries)
-    df_deliveries = enrich_with_distance(df_deliveries)
-    # 1. Enrich with weather data
+    # 2. Enrich with weather data from another source
     df_deliveries = enrich_with_weather(df_deliveries, weather_data)
-    # 2. Calculate delivery times
-    # 3. Determine status (on time/delayed)
+    # 3. Simulate distance and delivery time for this exercise
+    df_deliveries = enrich_with_random_distance_and_delivery_time(df_deliveries)
+    # 4. Determine status (on time/delayed) with a calculated threshold
     df_deliveries = enrich_with_status(df_deliveries)
-    # 4. Handle missing values
     
     return df_deliveries  # Return transformed DataFrame
 
-# 5. LOADING FUNCTION (to be completed)
+# 5. LOADING FUNCTION
 def save_results(df):
     """
     Saves the final DataFrame to CSV
     """
     logger.info("Saving results...")
+    try :
+        # We rename and then sort and select the columns we need in specific order
+        df = df.rename(columns={
+        'delivery_id': 'Delivery_ID',
+        'pickup_datetime': 'Pickup_DateTime',
+        'weekday': 'Weekday',
+        'hour': 'Hour',
+        'package_type': 'Package_Type',
+        'distance': 'Distance',
+        'delivery_zone': 'Delivery_Zone',
+        'WeatherCondition': 'Weather_Condition',
+        'actual_delivery_time': 'Actual_Delivery_Time',
+        'status': 'Status'
+        })
+        desired_order = [
+        "Delivery_ID",
+        "Pickup_DateTime",
+        "Weekday",
+        "Hour",
+        "Package_Type",
+        "Distance",
+        "Delivery_Zone",
+        "Weather_Condition",
+        "Actual_Delivery_Time",
+        "Status"
+        ]
+
+        df = df[desired_order]
+
+        # Save to CSV
+        df.to_csv(OUTPUT_PATH, index=False)
     
-    # TODO: Add your data validation code here
-    
-    # Save to CSV
-    df.to_csv(OUTPUT_PATH, index=False)
-    
-    logger.info(f"Results saved to {OUTPUT_PATH}")
-    return True
+        logger.info(f"Results saved to {OUTPUT_PATH}")
+        return True
+    except Exception as e:
+        logger.error(f"Error saving results: {e}")
+        return False
 
 # MAIN FUNCTION
 def run_pipeline():
