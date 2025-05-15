@@ -360,7 +360,20 @@ def run_pipeline():
         
         # Step 4: Loading
         save_results(df_transformed)
+
+        # Step 5: Stats
+        on_time = df_transformed[df_transformed['status'] == 'On-time'].shape[0]
+        delayed = df_transformed[df_transformed['status'] == 'Delayed'].shape[0]
+        total = len(df_transformed)
+
+        if total > 0:
+            delay_ratio = delayed / total * 100
+            ontime_ratio = on_time / total * 100
+            logger.info(f"Delivery Status Summary: {on_time} On-time ({ontime_ratio:.1f}%) | {delayed} Delayed ({delay_ratio:.1f}%)")
+        else:
+            logger.warning("No data available to compute statistics.")
         
+
         logger.info("ETL pipeline completed successfully")
         return True
         
