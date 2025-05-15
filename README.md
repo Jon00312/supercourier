@@ -55,6 +55,16 @@ Delivery_ID,Pickup_DateTime,Weekday,Hour,Package_Type,Distance,Delivery_Zone,Wea
 ```
 ---
 
+## 📊 Final Statistics
+
+At the end of the pipeline, a summary of delivery status is displayed in the logs:
+
+```
+Delivery Status Summary: 948 On-time (94.8%) | 52 Delayed (5.2%)
+```
+
+---
+
 ## 🛠️ How to Run
 
 ```bash
